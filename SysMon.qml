@@ -7,7 +7,6 @@ BarWidget {
   id: root
   moduleName: "io.github.arslan.sysmon"
 
-  // ---- live data for the bar labels (panel collects its own via collector.py)
   SysMonCore {
     id: sys
     intervalMs: 2000
@@ -15,7 +14,6 @@ BarWidget {
 
   readonly property color white: "#ffffff"
 
-  // Prefer panel snapshot data when panel is open, fall back to SysMonCore
   readonly property var snap: panelLoader.item && panelLoader.item.snapshot ? panelLoader.item.snapshot : null
   readonly property real cpuPercent: snap && snap.cpu ? snap.cpu.total : sys.cpuPercent
   readonly property real memPercent: snap ? (snap.mem && snap.mem.total > 0 ? (snap.mem.used / snap.mem.total * 100) : sys.memPercent) : sys.memPercent
@@ -55,7 +53,7 @@ BarWidget {
     if (!p) return
     if ("bar" in p) p.bar = root.bar
     if ("settings" in p) p.settings = root.settings
-    if ("anchorItem" in p) p.anchorItem = cpuBtn
+    if ("anchorItem" in p) p.anchorItem = cpuPill
     if ("hostWidget" in p) p.hostWidget = root
   }
 
@@ -101,7 +99,7 @@ BarWidget {
     }
   }
 
-  // ---- bar widget: 4 colored metric buttons ---------------------------------
+  // ---- bar widget: 4 colored metric pills -----------------------------------
   implicitWidth: row.implicitWidth
   implicitHeight: Style.bar.sizeHorizontal
 
@@ -110,79 +108,126 @@ BarWidget {
     anchors.centerIn: parent
     spacing: 6
 
-    Rectangle {
-      implicitWidth: cpuBtn.implicitWidth
-      implicitHeight: cpuBtn.implicitHeight
-      radius: height / 2
-      color: "transparent"
+    // Each pill: Rectangle background + Text.RichText label + MouseArea.
+    // Matches WidgetButton font, sizing, and hover feel exactly.
 
-      WidgetButton {
-        id: cpuBtn
+    Rectangle {
+      id: cpuPill
+      implicitWidth: cpuLabel.implicitWidth + Style.spaceReal(8.5) * 2
+      implicitHeight: Style.bar.sizeHorizontal
+      radius: height / 2
+      color: cpuMouse.containsMouse ? Qt.lighter(Color.bar.background, 1.5) : "transparent"
+      Behavior on color { ColorAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+      Text {
+        id: cpuLabel
+        anchors.centerIn: parent
+        textFormat: Text.RichText
+        text: "<font color='" + stateColor(root.cpuPercent, "#4da6ff") + "'>\u{F035B}</font> <font color='" + textColor(root.cpuPercent) + "'>" + root.cpuFreqText + " (" + Math.round(root.cpuPercent) + "%)</font>"
+        font.family: root.bar ? root.bar.fontFamily : Style.font.family
+        font.pixelSize: Style.font.body
+        color: root.bar ? root.bar.barForeground : Color.foreground
+        renderType: Text.NativeRendering
+      }
+
+      MouseArea {
+        id: cpuMouse
         anchors.fill: parent
-        bar: root.bar
-        text: "\u{F035B} " + root.cpuFreqText + " (" + Math.round(root.cpuPercent) + "%)"
-        fontSize: Style.font.body
-        horizontalMargin: 5
-        verticalPadding: 2
-        tooltipText: sys.cpuModelName ? sys.cpuModelName : "CPU"
-        onPressed: function(b) { if (b === Qt.LeftButton) root.openTab("cpu") }
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: function(mouse) { if (mouse.button === Qt.LeftButton) root.openTab("cpu") }
+        onEntered: { if (root.bar) root.bar.showTooltip(cpuLabel, sys.cpuModelName ? sys.cpuModelName : "CPU") }
+        onExited: { if (root.bar) root.bar.hideTooltip(cpuLabel) }
       }
     }
 
     Rectangle {
-      implicitWidth: memBtn.implicitWidth
-      implicitHeight: memBtn.implicitHeight
+      id: memPill
+      implicitWidth: memLabel.implicitWidth + Style.spaceReal(8.5) * 2
+      implicitHeight: Style.bar.sizeHorizontal
       radius: height / 2
-      color: "transparent"
+      color: memMouse.containsMouse ? Qt.lighter(Color.bar.background, 1.5) : "transparent"
+      Behavior on color { ColorAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
-      WidgetButton {
-        id: memBtn
+      Text {
+        id: memLabel
+        anchors.centerIn: parent
+        textFormat: Text.RichText
+        text: "<font color='" + stateColor(root.memPercent, "#66ff66") + "'>\u{F046D}</font> <font color='" + textColor(root.memPercent) + "'>" + Math.round(root.memPercent) + "%</font>"
+        font.family: root.bar ? root.bar.fontFamily : Style.font.family
+        font.pixelSize: Style.font.body
+        color: root.bar ? root.bar.barForeground : Color.foreground
+        renderType: Text.NativeRendering
+      }
+
+      MouseArea {
+        id: memMouse
         anchors.fill: parent
-        bar: root.bar
-        text: "\u{F046D} " + Math.round(root.memPercent) + "%"
-        fontSize: Style.font.body
-        horizontalMargin: 5
-        verticalPadding: 2
-        tooltipText: snap && snap.mem ? Model.bytes(snap.mem.used) + " / " + Model.bytes(snap.mem.total) : Model.bytes(sys.memUsed) + " / " + Model.bytes(sys.memTotal)
-        onPressed: function(b) { if (b === Qt.LeftButton) root.openTab("mem") }
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: function(mouse) { if (mouse.button === Qt.LeftButton) root.openTab("mem") }
+        onEntered: { if (root.bar) root.bar.showTooltip(memLabel, snap && snap.mem ? Model.bytes(snap.mem.used) + " / " + Model.bytes(snap.mem.total) : Model.bytes(sys.memUsed) + " / " + Model.bytes(sys.memTotal)) }
+        onExited: { if (root.bar) root.bar.hideTooltip(memLabel) }
       }
     }
 
     Rectangle {
-      implicitWidth: tempBtn.implicitWidth
-      implicitHeight: tempBtn.implicitHeight
+      id: tempPill
+      implicitWidth: tempLabel.implicitWidth + Style.spaceReal(8.5) * 2
+      implicitHeight: Style.bar.sizeHorizontal
       radius: height / 2
-      color: "transparent"
+      color: tempMouse.containsMouse ? Qt.lighter(Color.bar.background, 1.5) : "transparent"
+      Behavior on color { ColorAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
-      WidgetButton {
-        id: tempBtn
+      Text {
+        id: tempLabel
+        anchors.centerIn: parent
+        textFormat: Text.RichText
+        text: "<font color='" + stateColor(root.tempC, root.tempC >= 50 ? "#ff9933" : "#4da6ff") + "'>" + tempIcon() + "</font> <font color='" + textColor(root.tempC >= 80 ? 100 : 0) + "'>" + Math.round(root.tempC) + "\u00B0C</font>"
+        font.family: root.bar ? root.bar.fontFamily : Style.font.family
+        font.pixelSize: Style.font.body
+        color: root.bar ? root.bar.barForeground : Color.foreground
+        renderType: Text.NativeRendering
+      }
+
+      MouseArea {
+        id: tempMouse
         anchors.fill: parent
-        bar: root.bar
-        text: tempIcon() + " " + Math.round(root.tempC) + "\u00B0C"
-        fontSize: Style.font.body
-        horizontalMargin: 5
-        verticalPadding: 2
-        tooltipText: Math.round(root.tempC) + "°C / " + Math.round(root.tempC * 1.8 + 32) + "°F"
-        onPressed: function(b) { if (b === Qt.LeftButton) root.openTab("temp") }
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: function(mouse) { if (mouse.button === Qt.LeftButton) root.openTab("temp") }
+        onEntered: { if (root.bar) root.bar.showTooltip(tempLabel, Math.round(root.tempC) + "°C / " + Math.round(root.tempC * 1.8 + 32) + "°F") }
+        onExited: { if (root.bar) root.bar.hideTooltip(tempLabel) }
       }
     }
 
     Rectangle {
-      implicitWidth: diskBtn.implicitWidth
-      implicitHeight: diskBtn.implicitHeight
+      id: diskPill
+      implicitWidth: diskLabel.implicitWidth + Style.spaceReal(8.5) * 2
+      implicitHeight: Style.bar.sizeHorizontal
       radius: height / 2
-      color: "transparent"
+      color: diskMouse.containsMouse ? Qt.lighter(Color.bar.background, 1.5) : "transparent"
+      Behavior on color { ColorAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
-      WidgetButton {
-        id: diskBtn
+      Text {
+        id: diskLabel
+        anchors.centerIn: parent
+        textFormat: Text.RichText
+        text: "<font color='" + stateColor(root.diskPercent, white) + "'>\u{F02CA}</font> <font color='" + textColor(root.diskPercent) + "'>" + Math.round(root.diskPercent) + "%</font>"
+        font.family: root.bar ? root.bar.fontFamily : Style.font.family
+        font.pixelSize: Style.font.body
+        color: root.bar ? root.bar.barForeground : Color.foreground
+        renderType: Text.NativeRendering
+      }
+
+      MouseArea {
+        id: diskMouse
         anchors.fill: parent
-        bar: root.bar
-        text: "\u{F02CA} " + Math.round(root.diskPercent) + "%"
-        fontSize: Style.font.body
-        horizontalMargin: 5
-        verticalPadding: 2
-        tooltipText: snap && snap.disk ? Model.bytes(snap.disk.used) + " / " + Model.bytes(snap.disk.total) : Model.bytes(sys.diskUsed) + " / " + Model.bytes(sys.diskTotal)
-        onPressed: function(b) { if (b === Qt.LeftButton) root.openTab("disk") }
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: function(mouse) { if (mouse.button === Qt.LeftButton) root.openTab("disk") }
+        onEntered: { if (root.bar) root.bar.showTooltip(diskLabel, snap && snap.disk ? Model.bytes(snap.disk.used) + " / " + Model.bytes(snap.disk.total) : Model.bytes(sys.diskUsed) + " / " + Model.bytes(sys.diskTotal)) }
+        onExited: { if (root.bar) root.bar.hideTooltip(diskLabel) }
       }
     }
   }
