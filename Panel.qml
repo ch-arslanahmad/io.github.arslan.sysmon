@@ -81,7 +81,12 @@ Panel {
   }
 
   function setCenterHoverRevealSuppressed(value) {
-    if (root.bar && "centerHoverRevealSuppressed" in root.bar)
+    // The plugin bar facade exposes this state read-only; assigning to it
+    // throws and aborts open()/close() before the controller is called.
+    if (!root.bar) return
+    if (typeof root.bar.setCenterHoverRevealSuppressed === "function")
+      root.bar.setCenterHoverRevealSuppressed(value)
+    else if ("centerHoverRevealSuppressed" in root.bar)
       root.bar.centerHoverRevealSuppressed = value
   }
 
